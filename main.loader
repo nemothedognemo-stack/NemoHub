@@ -1,39 +1,585 @@
--- Nemohub loader
+-- NemoHub Loader (5 games supported rn)
 -- Load: loadstring(game:HttpGet("https://raw.githubusercontent.com/nemothedognemo-stack/NemoHub/main/main.loader"))()
 
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+----------------------------------------------------------------
+-- Games 
+----------------------------------------------------------------
 local GAMES = {
-    [142823291]   = "https://raw.githubusercontent.com/nemothedognemo-stack/Mm2-Starshub/main/lol",          -- Murder Mystery 2 ✅
-    [16732694052] = "https://raw.githubusercontent.com/wehibuyfgyuwe/99nights.github.io/main/ringta.lua",    -- 99 Nights ✅
-    [6516141723]  = "https://raw.githubusercontent.com/ImNotWhyLclc/Rendex/main/Loader.luau",                -- DOORS ✅
-    [286090429]   = "https://raw.githubusercontent.com/FacilityHUB/Facility-Sexility/main/Loader",           -- Arsenal ✅
-    [6403373529]  = "https://raw.githubusercontent.com/vortexorbimagine/loaders/main/loaders/slap-battles-spam0-mzvdqufwl4cj4k-o.lua", -- Slap Battles ✅
+    { id = 142823291,   name = "Murder Mystery 2",        url = "https://raw.githubusercontent.com/nemothedognemo-stack/Mm2-Starshub/main/lol" },
+    { id = 16732694052, name = "99 Nights in the Forest", url = "https://raw.githubusercontent.com/wehibuyfgyuwe/99nights.github.io/main/ringta.lua" },
+    { id = 6516141723,  name = "DOORS",                   url = "https://raw.githubusercontent.com/ImNotWhyLclc/Rendex/main/Loader.luau" },
+    { id = 286090429,   name = "Arsenal",                 url = "https://raw.githubusercontent.com/FacilityHUB/Facility-Sexility/main/Loader" },
+    { id = 6403373529,  name = "Slap Battles",           url = "https://raw.githubusercontent.com/vortexorbimagine/loaders/main/loaders/slap-battles-spam0-mzvdqufwl4cj4k-o.lua" },
 }
 
-local url = GAMES[game.PlaceId]
-
-if not url then
-    warn("[Nemo] Unsupported game (PlaceId: " .. game.PlaceId .. ")")
-    return
+local currentGame
+for _, g in ipairs(GAMES) do
+    if g.id == game.PlaceId then
+        currentGame = g
+        break
+    end
 end
 
-print("[Nemo] Loading script for PlaceId", game.PlaceId)
+----------------------------------------------------------------
+-- Theme
+----------------------------------------------------------------
+local ACCENT_1 = Color3.fromRGB(140, 90, 255)
+local ACCENT_2 = Color3.fromRGB(60, 190, 255)
+local BG_TOP = Color3.fromRGB(28, 26, 40)
+local BG_BOTTOM = Color3.fromRGB(16, 16, 24)
+local CARD = Color3.fromRGB(34, 34, 48)
+local CARD_HOVER = Color3.fromRGB(46, 44, 66)
+local TEXT = Color3.fromRGB(240, 240, 245)
+local SUBTEXT = Color3.fromRGB(150, 150, 170)
+local GREEN = Color3.fromRGB(90, 220, 130)
+local RED = Color3.fromRGB(255, 90, 100)
+local YELLOW = Color3.fromRGB(255, 200, 80)
 
-local ok, src = pcall(function()
-    return game:HttpGet(url)
+----------------------------------------------------------------
+-- Helpers
+----------------------------------------------------------------
+local function new(class, props, parent)
+    local inst = Instance.new(class)
+    for k, v in pairs(props) do
+        inst[k] = v
+    end
+    inst.Parent = parent
+    return inst
+end
+
+local function tween(obj, time, goal, style, dir)
+    local t = TweenService:Create(
+        obj,
+        TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out),
+        goal
+    )
+    t:Play()
+    return t
+end
+
+local function getParent()
+    local ok, res = pcall(function()
+        return (gethui and gethui()) or game:GetService("CoreGui")
+    end)
+    if ok and res then
+        return res
+    end
+    return LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local function accentGradient(parent)
+    return new("UIGradient", {
+        Color = ColorSequence.new(ACCENT_1, ACCENT_2),
+    }, parent)
+end
+
+-- remove old copy if re-executed
+local parentGui = getParent()
+local old = parentGui:FindFirstChild("NemoHub")
+if old then
+    old:Destroy()
+end
+
+local connections = {}
+local function connect(signal, fn)
+    local c = signal:Connect(fn)
+    table.insert(connections, c)
+    return c
+end
+
+----------------------------------------------------------------
+-- Root + main window
+----------------------------------------------------------------
+local gui = new("ScreenGui", {
+    Name = "NemoHub",
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    IgnoreGuiInset = true,
+}, parentGui)
+
+local root = new("Frame", {
+    Name = "Root",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.fromOffset(440, 500),
+    BackgroundTransparency = 1,
+}, gui)
+
+local uiScale = new("UIScale", { Scale = 0.8 }, root)
+
+local shadow = new("ImageLabel", {
+    Name = "Shadow",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.new(1, 44, 1, 44),
+    BackgroundTransparency = 1,
+    Image = "rbxassetid://1316045217",
+    ImageColor3 = Color3.new(0, 0, 0),
+    ImageTransparency = 1,
+    ScaleType = Enum.ScaleType.Slice,
+    SliceCenter = Rect.new(10, 10, 118, 118),
+    ZIndex = 0,
+}, root)
+
+local main = new("CanvasGroup", {
+    Name = "Main",
+    Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    GroupTransparency = 1,
+}, root)
+
+new("UICorner", { CornerRadius = UDim.new(0, 16) }, main)
+
+local bg = new("Frame", {
+    Name = "Background",
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Color3.new(1, 1, 1),
+    BorderSizePixel = 0,
+}, main)
+new("UIGradient", {
+    Color = ColorSequence.new(BG_TOP, BG_BOTTOM),
+    Rotation = 90,
+}, bg)
+
+-- soft purple glow at the top
+local glow = new("Frame", {
+    Name = "Glow",
+    Size = UDim2.new(1, 0, 0, 140),
+    BackgroundColor3 = ACCENT_1,
+    BorderSizePixel = 0,
+}, bg)
+new("UIGradient", {
+    Rotation = 90,
+    Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.82),
+        NumberSequenceKeypoint.new(1, 1),
+    }),
+}, glow)
+
+-- animated gradient border
+local stroke = new("UIStroke", {
+    Thickness = 2,
+    Color = Color3.new(1, 1, 1),
+    ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+}, main)
+local strokeGradient = accentGradient(stroke)
+
+connect(RunService.Heartbeat, function(dt)
+    strokeGradient.Rotation = (strokeGradient.Rotation + dt * 60) % 360
 end)
 
-if not ok or not src then
-    warn("[Nemo] Failed to download:", tostring(src))
+----------------------------------------------------------------
+-- Header (drag handle + title + close)
+----------------------------------------------------------------
+local header = new("Frame", {
+    Name = "Header",
+    Size = UDim2.new(1, 0, 0, 48),
+    BackgroundTransparency = 1,
+    Active = true,
+}, main)
+
+local title = new("TextLabel", {
+    Name = "Title",
+    Position = UDim2.fromOffset(18, 5),
+    Size = UDim2.new(0, 200, 0, 28),
+    BackgroundTransparency = 1,
+    Text = "NemoHub",
+    TextColor3 = Color3.new(1, 1, 1),
+    TextSize = 24,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, header)
+accentGradient(title)
+
+new("TextLabel", {
+    Name = "Subtitle",
+    Position = UDim2.fromOffset(18, 30),
+    Size = UDim2.new(0, 260, 0, 14),
+    BackgroundTransparency = 1,
+    Text = "RightShift to hide / show",
+    TextColor3 = SUBTEXT,
+    TextSize = 11,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, header)
+
+local closeBtn = new("TextButton", {
+    Name = "Close",
+    AnchorPoint = Vector2.new(1, 0.5),
+    Position = UDim2.new(1, -14, 0.5, 0),
+    Size = UDim2.fromOffset(30, 30),
+    BackgroundColor3 = Color3.fromRGB(60, 40, 52),
+    Text = "X",
+    TextColor3 = RED,
+    TextSize = 16,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+    BorderSizePixel = 0,
+}, header)
+new("UICorner", { CornerRadius = UDim.new(0, 8) }, closeBtn)
+
+connect(closeBtn.MouseEnter, function()
+    tween(closeBtn, 0.15, { BackgroundColor3 = RED, TextColor3 = Color3.new(1, 1, 1) })
+end)
+connect(closeBtn.MouseLeave, function()
+    tween(closeBtn, 0.15, { BackgroundColor3 = Color3.fromRGB(60, 40, 52), TextColor3 = RED })
+end)
+
+new("Frame", {
+    Name = "Divider",
+    Position = UDim2.new(0, 14, 1, -1),
+    Size = UDim2.new(1, -28, 0, 1),
+    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+    BackgroundTransparency = 0.9,
+    BorderSizePixel = 0,
+}, header)
+
+----------------------------------------------------------------
+-- Profile card (headshot + username + status)
+----------------------------------------------------------------
+local profile = new("Frame", {
+    Name = "Profile",
+    Position = UDim2.fromOffset(14, 58),
+    Size = UDim2.new(1, -28, 0, 80),
+    BackgroundColor3 = CARD,
+    BorderSizePixel = 0,
+}, main)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, profile)
+
+local avatar = new("ImageLabel", {
+    Name = "Headshot",
+    Position = UDim2.fromOffset(12, 12),
+    Size = UDim2.fromOffset(56, 56),
+    BackgroundColor3 = Color3.fromRGB(20, 20, 30),
+    BorderSizePixel = 0,
+    Image = "",
+}, profile)
+new("UICorner", { CornerRadius = UDim.new(1, 0) }, avatar)
+local avatarStroke = new("UIStroke", { Thickness = 2, Color = Color3.new(1, 1, 1) }, avatar)
+accentGradient(avatarStroke)
+
+task.spawn(function()
+    local ok, img = pcall(function()
+        return Players:GetUserThumbnailAsync(
+            LocalPlayer.UserId,
+            Enum.ThumbnailType.HeadShot,
+            Enum.ThumbnailSize.Size100x100
+        )
+    end)
+    if ok and img and avatar.Parent then
+        avatar.Image = img
+    end
+end)
+
+new("TextLabel", {
+    Name = "DisplayName",
+    Position = UDim2.fromOffset(80, 10),
+    Size = UDim2.new(1, -92, 0, 22),
+    BackgroundTransparency = 1,
+    Text = LocalPlayer.DisplayName,
+    TextColor3 = TEXT,
+    TextSize = 18,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextTruncate = Enum.TextTruncate.AtEnd,
+}, profile)
+
+new("TextLabel", {
+    Name = "Username",
+    Position = UDim2.fromOffset(80, 32),
+    Size = UDim2.new(1, -92, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "@" .. LocalPlayer.Name,
+    TextColor3 = SUBTEXT,
+    TextSize = 13,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextTruncate = Enum.TextTruncate.AtEnd,
+}, profile)
+
+local statusDot = new("Frame", {
+    Name = "StatusDot",
+    Position = UDim2.fromOffset(80, 55),
+    Size = UDim2.fromOffset(8, 8),
+    BackgroundColor3 = YELLOW,
+    BorderSizePixel = 0,
+}, profile)
+new("UICorner", { CornerRadius = UDim.new(1, 0) }, statusDot)
+
+local status = new("TextLabel", {
+    Name = "Status",
+    Position = UDim2.fromOffset(94, 50),
+    Size = UDim2.new(1, -106, 0, 18),
+    BackgroundTransparency = 1,
+    Text = "Starting...",
+    TextColor3 = YELLOW,
+    TextSize = 13,
+    Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextTruncate = Enum.TextTruncate.AtEnd,
+}, profile)
+
+local function setStatus(text, color)
+    status.Text = text
+    tween(status, 0.2, { TextColor3 = color })
+    tween(statusDot, 0.2, { BackgroundColor3 = color })
+end
+
+-- pulsing status dot
+connect(RunService.Heartbeat, function()
+    statusDot.BackgroundTransparency = 0.45 * (1 + math.sin(os.clock() * 4)) * 0.5
+end)
+
+
+----------------------------------------------------------------
+-- Games list
+----------------------------------------------------------------
+new("TextLabel", {
+    Name = "GamesLabel",
+    Position = UDim2.fromOffset(18, 148),
+    Size = UDim2.new(1, -36, 0, 20),
+    BackgroundTransparency = 1,
+    Text = "Supported games",
+    TextColor3 = SUBTEXT,
+    TextSize = 14,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, main)
+
+local list = new("ScrollingFrame", {
+    Name = "List",
+    Position = UDim2.fromOffset(14, 172),
+    Size = UDim2.new(1, -28, 1, -186),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 3,
+    ScrollBarImageColor3 = ACCENT_1,
+    CanvasSize = UDim2.new(),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+}, main)
+new("UIListLayout", {
+    Padding = UDim.new(0, 8),
+    SortOrder = Enum.SortOrder.LayoutOrder,
+}, list)
+new("UIPadding", { PaddingRight = UDim.new(0, 6) }, list)
+
+local function makeCard(g, index)
+    local isCurrent = currentGame == g
+
+    local card = new("CanvasGroup", {
+        Name = g.name,
+        LayoutOrder = index,
+        Size = UDim2.new(1, 0, 0, 56),
+        BackgroundColor3 = CARD,
+        BorderSizePixel = 0,
+        GroupTransparency = 1,
+    }, list)
+    new("UICorner", { CornerRadius = UDim.new(0, 12) }, card)
+
+    -- accent bar
+    local bar = new("Frame", {
+        Size = UDim2.new(0, 4, 1, 0),
+        BackgroundColor3 = isCurrent and GREEN or ACCENT_1,
+        BorderSizePixel = 0,
+    }, card)
+    if not isCurrent then
+        accentGradient(bar).Rotation = 90
+    end
+
+    new("TextLabel", {
+        Position = UDim2.fromOffset(16, 8),
+        Size = UDim2.new(1, -110, 0, 20),
+        BackgroundTransparency = 1,
+        Text = g.name,
+        TextColor3 = TEXT,
+        TextSize = 16,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+    }, card)
+
+    new("TextLabel", {
+        Position = UDim2.fromOffset(16, 29),
+        Size = UDim2.new(1, -110, 0, 16),
+        BackgroundTransparency = 1,
+        Text = "ID: " .. tostring(g.id),
+        TextColor3 = SUBTEXT,
+        TextSize = 12,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, card)
+
+    -- card hover
+    connect(card.MouseEnter, function()
+        tween(card, 0.15, { BackgroundColor3 = CARD_HOVER })
+    end)
+    connect(card.MouseLeave, function()
+        tween(card, 0.15, { BackgroundColor3 = CARD })
+    end)
+
+    -- small badge only on the game you're currently in
+    if isCurrent then
+        local badge = new("TextLabel", {
+            Name = "CurrentBadge",
+            AnchorPoint = Vector2.new(1, 0.5),
+            Position = UDim2.new(1, -12, 0.5, 0),
+            Size = UDim2.fromOffset(84, 28),
+            BackgroundColor3 = Color3.fromRGB(40, 70, 52),
+            Text = "Current",
+            TextColor3 = GREEN,
+            TextSize = 13,
+            Font = Enum.Font.GothamBold,
+            BorderSizePixel = 0,
+        }, card)
+        new("UICorner", { CornerRadius = UDim.new(0, 9) }, badge)
+    end
+
+    -- staggered fade-in
+    task.delay(0.35 + index * 0.08, function()
+        if card.Parent then
+            tween(card, 0.35, { GroupTransparency = 0 })
+        end
+    end)
+end
+
+for i, g in ipairs(GAMES) do
+    makeCard(g, i)
+end
+
+----------------------------------------------------------------
+-- Dragging
+----------------------------------------------------------------
+do
+    local dragging, dragStart, startPos
+    connect(header.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = root.Position
+            local c
+            c = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    c:Disconnect()
+                end
+            end)
+        end
+    end)
+    connect(UserInputService.InputChanged, function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch) then
+            local d = input.Position - dragStart
+            root.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
+            )
+        end
+    end)
+end
+
+----------------------------------------------------------------
+-- Open / close animations (+ RightShift to hide/show)
+----------------------------------------------------------------
+local closing = false
+local function destroyHub()
+    if closing then
+        return
+    end
+    closing = true
+    tween(uiScale, 0.25, { Scale = 0.8 }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    tween(main, 0.25, { GroupTransparency = 1 })
+    tween(shadow, 0.25, { ImageTransparency = 1 })
+    task.delay(0.3, function()
+        for _, c in ipairs(connections) do
+            c:Disconnect()
+        end
+        gui:Destroy()
+    end)
+end
+connect(closeBtn.MouseButton1Click, destroyHub)
+
+local hidden = false
+connect(UserInputService.InputBegan, function(input, processed)
+    if processed or closing then
+        return
+    end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        hidden = not hidden
+        if hidden then
+            tween(uiScale, 0.2, { Scale = 0.8 }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            tween(main, 0.2, { GroupTransparency = 1 })
+            tween(shadow, 0.2, { ImageTransparency = 1 })
+            task.delay(0.2, function()
+                if hidden then
+                    root.Visible = false
+                end
+            end)
+        else
+            root.Visible = true
+            tween(uiScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+            tween(main, 0.25, { GroupTransparency = 0 })
+            tween(shadow, 0.25, { ImageTransparency = 0.55 })
+        end
+    end
+end)
+
+tween(uiScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+tween(main, 0.35, { GroupTransparency = 0 })
+tween(shadow, 0.35, { ImageTransparency = 0.55 })
+
+----------------------------------------------------------------
+-- Script loading (same logic as before)
+----------------------------------------------------------------
+if not currentGame then
+    warn("[NemoHub] Unsupported game (PlaceId: " .. game.PlaceId .. ")")
+    setStatus("Game not supported", RED)
     return
 end
 
-local chunk, err = loadstring(src)
-if not chunk then
-    warn("[Nemo] Syntax error:", err)
-    return
-end
+task.spawn(function()
+    task.wait(0.6)
+    setStatus("Loading " .. currentGame.name .. "...", YELLOW)
+    print("[NemoHub] Loading script for PlaceId", game.PlaceId)
 
-local runOk, runErr = pcall(chunk)
-if not runOk then
-    warn("[Nemo] Runtime error:", runErr)
-end
+    local ok, src = pcall(function()
+        return game:HttpGet(currentGame.url)
+    end)
+    if not ok or not src then
+        warn("[NemoHub] Failed to download:", tostring(src))
+        setStatus("Failed to download script", RED)
+        return
+    end
+
+    local chunk, err = loadstring(src)
+    if not chunk then
+        warn("[NemoHub] Syntax error:", err)
+        setStatus("Script syntax error", RED)
+        return
+    end
+
+    local runOk, runErr = pcall(chunk)
+    if not runOk then
+        warn("[NemoHub] Runtime error:", runErr)
+        setStatus("Script runtime error", RED)
+        return
+    end
+
+    -- supported game loaded: show a 5 second countdown, then close the hub
+    for i = 5, 1, -1 do
+        if closing or not gui.Parent then
+            return
+        end
+        setStatus("Loaded: " .. currentGame.name .. " - closing in " .. i .. "s", GREEN)
+        task.wait(1)
+    end
+    destroyHub()
+end)
