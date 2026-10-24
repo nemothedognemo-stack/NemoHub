@@ -1,1 +1,39 @@
+-- Nemohub loader
+-- Load: loadstring(game:HttpGet("https://raw.githubusercontent.com/nemothedognemo-stack/NemoHub/main/main.loader"))()
 
+local GAMES = {
+    [142823291]   = "https://raw.githubusercontent.com/nemothedognemo-stack/Mm2-Starshub/main/lol",          -- Murder Mystery 2 ✅
+    [16732694052] = "https://raw.githubusercontent.com/wehibuyfgyuwe/99nights.github.io/main/ringta.lua",    -- 99 Nights ✅
+    [6516141723]  = "https://raw.githubusercontent.com/ImNotWhyLclc/Rendex/main/Loader.luau",                -- DOORS ✅
+    [286090429]   = "https://raw.githubusercontent.com/FacilityHUB/Facility-Sexility/main/Loader",           -- Arsenal ✅
+    [6403373529]  = "https://raw.githubusercontent.com/vortexorbimagine/loaders/main/loaders/slap-battles-spam0-mzvdqufwl4cj4k-o.lua", -- Slap Battles ✅
+}
+
+local url = GAMES[game.PlaceId]
+
+if not url then
+    warn("[Nemo] Unsupported game (PlaceId: " .. game.PlaceId .. ")")
+    return
+end
+
+print("[Nemo] Loading script for PlaceId", game.PlaceId)
+
+local ok, src = pcall(function()
+    return game:HttpGet(url)
+end)
+
+if not ok or not src then
+    warn("[Nemo] Failed to download:", tostring(src))
+    return
+end
+
+local chunk, err = loadstring(src)
+if not chunk then
+    warn("[Nemo] Syntax error:", err)
+    return
+end
+
+local runOk, runErr = pcall(chunk)
+if not runOk then
+    warn("[Nemo] Runtime error:", runErr)
+end
